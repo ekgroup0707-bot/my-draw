@@ -1,0 +1,31 @@
+name: Build unsigned IPA
+on: workflow_dispatch
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npx expo prebuild --platform ios
+      - name: Archive without signing
+        run: |
+          cd ios
+          WS=$(ls -d *.xcworkspace | head -1)
+          SCHEME="${WS%.xcworkspace}"
+          xcodebuild -workspace "$WS" -scheme "$SCHEME" -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' \
+            -archivePath "$PWD/build/App.xcarchive" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            archive
+      - name: Make ipa
+        run: |
+          mkdir Payload
+          cp -R ios/build/App.xcarchive/Products/Applications/*.app Payload/
+          zip -r MyDraw.ipa Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MyDraw-ipa
+          path: MyDraw.ipa
